@@ -141,6 +141,13 @@ data:extend({
     {
         setting_type = "startup",
         type = "bool-setting",
+        name = "propertyrandomizer-recycling",
+        default_value = false,
+        order = "d-db[recycling]"
+    },
+    {
+        setting_type = "startup",
+        type = "bool-setting",
         name = "propertyrandomizer-recipe-tech-unlock",
         default_value = false,
         order = "d-e[recipe-tech-unlock]"

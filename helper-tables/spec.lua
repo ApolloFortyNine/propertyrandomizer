@@ -1289,6 +1289,15 @@ local spec = {
             val = "more"
         }
     },]]
+    -- Randomizes the amounts of ingredients/results in recycling recipes
+    recycling_recipe_ingredients_numerical = {
+        category = "numerical",
+        setting = "propertyrandomizer-recycling"
+    },
+    recycling_recipe_results_numerical = {
+        category = "numerical",
+        setting = "propertyrandomizer-recycling"
+    },
     --[[repair_speed = {
         category = "numerical",
         setting = {
