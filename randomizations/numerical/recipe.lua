@@ -195,30 +195,50 @@ end
 
 -- New
 randomizations.recycling_recipe_results_numerical = function(id)
+    -- Gathers, per result type ("item" or "fluid"), the names of all outputs
+    -- produced by recycling recipes. These pools are then shuffled and reassigned
+    -- so that recycling yields different items/fluids than what went in.
+    local pools = { item = {}, fluid = {} }
     for _, recipe in pairs(data.raw.recipe) do
         if is_recycling_recipe(recipe) and recipe.results ~= nil then
-            local key = rng.key({ id = id, property = recipe })
             for _, result in pairs(recipe.results) do
-                if non_stackable_items[result.name] == nil then
-                    local old_amount = result.amount
-                    local ignored_by_stats = 0
-                    if result.ignored_by_stats ~= nil and result.ignored_by_stats <= old_amount then
-                        ignored_by_stats = result.ignored_by_stats
+                local pool = pools[result.type]
+                if pool ~= nil and result.name ~= nil then
+                    table.insert(pool, result.name)
+                end
+            end
+        end
+    end
+    local item_pool = pools.item
+    local fluid_pool = pools.fluid
+
+    -- Shuffle each pool independently so items map to items, fluids to fluids
+    rng.shuffle(rng.key({ id = id, property = "recycling-item-pool" }), item_pool)
+    rng.shuffle(rng.key({ id = id, property = "recycling-fluid-pool" }), fluid_pool)
+
+    local next_item = 1
+    local next_fluid = 1
+    for _, recipe in pairs(data.raw.recipe) do
+        if is_recycling_recipe(recipe) and recipe.results ~= nil then
+            for _, result in pairs(recipe.results) do
+                if result.type == "item" and #item_pool > 0 then
+                    local new_name = item_pool[next_item]
+                    next_item = next_item + 1
+                    if next_item > #item_pool then next_item = 1 end
+                    result.name = new_name
+                    -- Factorio rejects non-stackable products with a count above 1,
+                    -- so clamp the amount when the shuffled item is non-stackable
+                    if non_stackable_items[new_name] ~= nil then
+                        result.amount = 1
+                        result.amount_min = nil
+                        result.amount_max = nil
+                        result.extra_count_fraction = nil
                     end
-                    local old_production = old_amount - ignored_by_stats
-                    if old_production > 0 then
-                        local new_production = randomize({
-                            key = key,
-                            dummy = old_production,
-                            abs_min = 1,
-                            range = "small",
-                            variance = "small",
-                            dir = 1,
-                            rounding = "discrete",
-                            data_type = "uint16",
-                        })
-                        result.amount = new_production + ignored_by_stats
-                    end
+                elseif result.type == "fluid" and #fluid_pool > 0 then
+                    local new_name = fluid_pool[next_fluid]
+                    next_fluid = next_fluid + 1
+                    if next_fluid > #fluid_pool then next_fluid = 1 end
+                    result.name = new_name
                 end
             end
         end

@@ -305,6 +305,12 @@ end
 randomizations.fixes()
 do_overrides_postfixes()
 
+-- Recycling result randomization must run after fixes() since fixes() rebuilds
+-- recycling recipe results from scratch and would otherwise overwrite them.
+if settings.startup["propertyrandomizer-recycling"].value then
+    randomizations.recycling_recipe_results_numerical("recycling_recipe_results_numerical")
+end
+
 -- Final check for completability
 
 local final_sort_info = top_sort.sort(dep_graph)
