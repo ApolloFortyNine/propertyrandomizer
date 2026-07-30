@@ -158,3 +158,69 @@ randomizations.recipe_results_numerical = function(id)
         end
     end
 end
+
+local function is_recycling_recipe(recipe)
+    return recipe.category == "recycling" or recipe.category == "recycling-or-hand-crafting"
+end
+
+-- New
+randomizations.recycling_recipe_ingredients_numerical = function(id)
+    for _, recipe in pairs(data.raw.recipe) do
+        if is_recycling_recipe(recipe) and recipe.ingredients ~= nil then
+            local key = rng.key({ id = id, property = recipe })
+            for _, ing in pairs(recipe.ingredients) do
+                local old_amount = ing.amount
+                local ignored_by_stats = 0
+                if ing.ignored_by_stats ~= nil and ing.ignored_by_stats <= old_amount then
+                    ignored_by_stats = ing.ignored_by_stats
+                end
+                local old_production = old_amount - ignored_by_stats
+                if old_production > 0 then
+                    local new_production = randomize({
+                        key = key,
+                        dummy = old_production,
+                        abs_min = 1,
+                        range = "small",
+                        variance = "small",
+                        dir = -1,
+                        rounding = "discrete",
+                        data_type = "uint16",
+                    })
+                    ing.amount = new_production + ignored_by_stats
+                end
+            end
+        end
+    end
+end
+
+-- New
+randomizations.recycling_recipe_results_numerical = function(id)
+    for _, recipe in pairs(data.raw.recipe) do
+        if is_recycling_recipe(recipe) and recipe.results ~= nil then
+            local key = rng.key({ id = id, property = recipe })
+            for _, result in pairs(recipe.results) do
+                if non_stackable_items[result.name] == nil then
+                    local old_amount = result.amount
+                    local ignored_by_stats = 0
+                    if result.ignored_by_stats ~= nil and result.ignored_by_stats <= old_amount then
+                        ignored_by_stats = result.ignored_by_stats
+                    end
+                    local old_production = old_amount - ignored_by_stats
+                    if old_production > 0 then
+                        local new_production = randomize({
+                            key = key,
+                            dummy = old_production,
+                            abs_min = 1,
+                            range = "small",
+                            variance = "small",
+                            dir = 1,
+                            rounding = "discrete",
+                            data_type = "uint16",
+                        })
+                        result.amount = new_production + ignored_by_stats
+                    end
+                end
+            end
+        end
+    end
+end
