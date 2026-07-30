@@ -158,3 +158,139 @@ randomizations.recipe_results_numerical = function(id)
         end
     end
 end
+
+local function is_recycling_recipe(recipe)
+    return recipe.category == "recycling" or recipe.category == "recycling-or-hand-crafting"
+end
+
+-- New
+randomizations.recycling_recipe_ingredients_numerical = function(id)
+    for _, recipe in pairs(data.raw.recipe) do
+        if is_recycling_recipe(recipe) and recipe.ingredients ~= nil then
+            local key = rng.key({ id = id, property = recipe })
+            for _, ing in pairs(recipe.ingredients) do
+                local old_amount = ing.amount
+                local ignored_by_stats = 0
+                if ing.ignored_by_stats ~= nil and ing.ignored_by_stats <= old_amount then
+                    ignored_by_stats = ing.ignored_by_stats
+                end
+                local old_production = old_amount - ignored_by_stats
+                if old_production > 0 then
+                    local new_production = randomize({
+                        key = key,
+                        dummy = old_production,
+                        abs_min = 1,
+                        range = "small",
+                        variance = "small",
+                        dir = -1,
+                        rounding = "discrete",
+                        data_type = "uint16",
+                    })
+                    ing.amount = new_production + ignored_by_stats
+                end
+            end
+        end
+    end
+end
+
+-- Items that should never appear as recycling outputs, even if some recipe
+-- technically references them. Several of these (loader, item-unknown, the
+-- module-slot filler, etc.) are internal/hidden prototypes rather than real
+-- gameplay items, and the "fixes" pass that rebuilds recycling results can
+-- pull them in from reversible recipes' ingredients.
+local recycling_result_blacklist = {
+    ["loader"] = true,
+    ["loader-1x1"] = true,
+    ["item-unknown"] = true,
+    ["unknown"] = true,
+    ["empty-module-slot"] = true,
+    ["parameter-0"] = true,
+    ["parameter-1"] = true,
+    ["parameter-2"] = true,
+    ["parameter-3"] = true,
+    ["parameter-4"] = true,
+    ["parameter-5"] = true,
+    ["parameter-6"] = true,
+    ["parameter-7"] = true,
+    ["parameter-8"] = true,
+    ["parameter-9"] = true,
+}
+
+-- Lookup of item name -> prototype across all item classes, for hidden checks
+local item_name_to_prot = {}
+for item_class, _ in pairs(defines.prototypes.item) do
+    if data.raw[item_class] ~= nil then
+        for _, item in pairs(data.raw[item_class]) do
+            item_name_to_prot[item.name] = item
+        end
+    end
+end
+
+local function is_blacklisted_recycling_result(name)
+    if recycling_result_blacklist[name] then
+        return true
+    end
+    local prot = item_name_to_prot[name]
+    -- Hidden prototypes aren't real gameplay items
+    if prot ~= nil and (prot.hidden or prot.hidden_in_factoriopedia) then
+        return true
+    end
+    return false
+end
+
+-- New
+randomizations.recycling_recipe_results_numerical = function(id)
+    -- Gathers, per result type ("item" or "fluid"), the names of all outputs
+    -- produced by recycling recipes. These pools are then shuffled and reassigned
+    -- so that recycling yields different items/fluids than what went in.
+    local pools = { item = {}, fluid = {} }
+    for _, recipe in pairs(data.raw.recipe) do
+        if is_recycling_recipe(recipe) and recipe.results ~= nil then
+            for _, result in pairs(recipe.results) do
+                local pool = pools[result.type]
+                if pool ~= nil and result.name ~= nil then
+                    if result.type ~= "item" or not is_blacklisted_recycling_result(result.name) then
+                        table.insert(pool, result.name)
+                    end
+                end
+            end
+        end
+    end
+    local item_pool = pools.item
+    local fluid_pool = pools.fluid
+
+    -- Shuffle each pool independently so items map to items, fluids to fluids
+    rng.shuffle(rng.key({ id = id, property = "recycling-item-pool" }), item_pool)
+    rng.shuffle(rng.key({ id = id, property = "recycling-fluid-pool" }), fluid_pool)
+
+    local next_item = 1
+    local next_fluid = 1
+    for _, recipe in pairs(data.raw.recipe) do
+        if is_recycling_recipe(recipe) and recipe.results ~= nil then
+            -- The original main product may no longer exist among the shuffled
+            -- results, which Factorio rejects; clear it like fixes() does
+            recipe.main_product = nil
+            for _, result in pairs(recipe.results) do
+                if result.type == "item" and #item_pool > 0 then
+                    local new_name = item_pool[next_item]
+                    next_item = next_item + 1
+                    if next_item > #item_pool then next_item = 1 end
+                    result.name = new_name
+                    -- Factorio rejects non-stackable products with a count above 1,
+                    -- so clamp the amount when the shuffled item is non-stackable
+                    if non_stackable_items[new_name] ~= nil then
+                        result.amount = 1
+                        result.amount_min = nil
+                        result.amount_max = nil
+                        result.extra_count_fraction = nil
+                    end
+                elseif result.type == "fluid" and #fluid_pool > 0 then
+                    local new_name = fluid_pool[next_fluid]
+                    next_fluid = next_fluid + 1
+                    if next_fluid > #fluid_pool then next_fluid = 1 end
+                    result.name = new_name
+                end
+            end
+        end
+    end
+end

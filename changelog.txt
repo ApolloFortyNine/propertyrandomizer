@@ -6,6 +6,7 @@ Date: ?
     - Added ability to duplicate recipe tech unlocks for a smoother experience
     - Compatibility with any planet start
     - Ability to only randomize science pack ingredients
+    - Option to randomize recycling recipes: shuffles which items recycling yields and randomizes ingredient amounts
   Changes:
     - Overrides now accept upper and lower case x's and y's
     - Items randomized is 100% by default

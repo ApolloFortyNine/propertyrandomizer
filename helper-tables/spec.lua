@@ -1289,6 +1289,14 @@ local spec = {
             val = "more"
         }
     },]]
+    -- Randomizes the amounts of ingredients in recycling recipes
+    recycling_recipe_ingredients_numerical = {
+        category = "numerical",
+        setting = "propertyrandomizer-recycling"
+    },
+    -- recycling_recipe_results_numerical is intentionally NOT in this spec.
+    -- It must run after randomizations.fixes(), which rebuilds recycling
+    -- results, so it is invoked directly in data-final-fixes.lua instead.
     --[[repair_speed = {
         category = "numerical",
         setting = {
